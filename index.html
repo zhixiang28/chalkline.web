@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chalkline — log every climb, live every send</title>
+<meta name="description" content="Chalkline is the climbing companion app: log every attempt, run a live session timer, and share your sends with your crew.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M2 20 L9 7 L13 14 L16 9 L22 20 Z' fill='%23201E19'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --cream: #EDE8DA;
+    --paper: #F7F5EC;
+    --ink: #201E19;
+    --ink-soft: #5B584E;
+    --terracotta: #C1502E;
+    --moss: #4B6B45;
+    --ochre: #C88A12;
+    --line: rgba(32,30,25,0.14);
+    --radius: 4px;
+    --ease: cubic-bezier(.22,.68,0,1);
+  }
+
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+  body{
+    margin:0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3{
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  p{ margin: 0; }
+  a{ color: inherit; }
+  img{ max-width: 100%; display:block; }
+
+  .wrap{
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  @media (max-width: 560px){
+    .wrap{ padding: 0 20px; }
+  }
+
+  ::selection{ background: var(--ochre); color: var(--ink); }
+
+  /* ---------- focus ---------- */
+  a:focus-visible, button:focus-visible{
+    outline: 3px solid var(--terracotta);
+    outline-offset: 3px;
+  }
+
+  /* ---------- reveal on scroll ---------- */
+  .reveal{
+    opacity: 0;
+    transform: translateY(26px);
+    transition: opacity .7s var(--ease), transform .7s var(--ease);
+  }
+  .reveal.visible{
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal.d1{ transition-delay: .08s; }
+  .reveal.d2{ transition-delay: .16s; }
+
+  @media (prefers-reduced-motion: reduce){
+    .reveal{ opacity:1; transform:none; transition:none; }
+    html{ scroll-behavior:auto; }
+  }
+
+  /* ---------- top nav ---------- */
+  header.nav{
+    position: sticky; top:0; z-index: 50;
+    background: rgba(237,232,218,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid transparent;
+    transition: border-color .3s var(--ease), box-shadow .3s var(--ease);
+  }
+  header.nav.scrolled{
+    border-bottom-color: var(--line);
+    box-shadow: 0 6px 20px -14px rgba(32,30,25,0.35);
+  }
+  .nav-inner{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 32px;
+    max-width: 1120px; margin:0 auto;
+    gap: 16px;
+  }
+  @media (max-width: 560px){
+    .nav-inner{ padding: 12px 20px; }
+    .brand{ font-size: 17px; }
+    .brand svg{ width:21px; height:18px; }
+  }
+  .brand{ display:flex; align-items:center; gap:10px; font-family:'Space Grotesk'; font-weight:700; font-size:19px; flex: none; }
+  .brand svg{ flex:none; }
+
+  .subnav{
+    display:flex; gap: 22px;
+    list-style:none; margin:0; padding:0;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+  }
+  .subnav a{
+    text-decoration:none;
+    position:relative;
+    padding-bottom: 3px;
+  }
+  .subnav a::after{
+    content:"";
+    position:absolute; left:0; right:100%; bottom:0;
+    height: 2px; background: var(--terracotta);
+    transition: right .3s var(--ease);
+  }
+  .subnav a:hover::after,
+  .subnav a.active::after{ right: 0; }
+  .subnav a.active{ color: var(--ink); }
+
+  .btn{
+    position: relative;
+    display:inline-flex; align-items:center; gap:8px;
+    background: var(--ink); color: var(--cream);
+    padding: 12px 22px;
+    border-radius: var(--radius);
+    text-decoration:none;
+    font-weight:600;
+    font-size:15px;
+    border: 1px solid var(--ink);
+    overflow: hidden;
+    z-index: 0;
+  }
+  .btn::before{
+    content:"";
+    position:absolute; inset:0;
+    background: var(--terracotta);
+    border-color: var(--terracotta);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform .35s var(--ease);
+    z-index: -1;
+  }
+  .btn:hover::before{ transform: scaleX(1); }
+  .btn:hover{ border-color: var(--terracotta); }
+  .btn.small{ padding:9px 16px; font-size:14px; flex:none; }
+  .btn.ghost{
+    background:transparent; color:var(--ink); border:1px solid var(--ink);
+  }
+  .btn.ghost::before{ background: var(--ink); }
+  .btn.ghost:hover{ color: var(--cream); border-color: var(--ink); }
+
+  /* ---------- device frame (shared) ---------- */
+  .device{
+    position: relative;
+    width: 250px;
+    border-radius: 30px;
+    border: 6px solid var(--ink);
+    overflow:hidden;
+    background: var(--ink);
+    box-shadow: 8px 12px 0 rgba(32,30,25,0.10);
+    transition: transform .45s var(--ease), box-shadow .45s var(--ease);
+  }
+  .device::before{
+    content:"";
+    position:absolute;
+    top: 10px; left:50%;
+    transform: translateX(-50%);
+    width: 46px; height: 5px;
+    border-radius: 3px;
+    background: rgba(237,232,218,0.55);
+    z-index: 2;
+  }
+  .device .shot{
+    display:block;
+    width:100%;
+    aspect-ratio: 930 / 1794;
+    object-fit: cover;
+    object-position: top center;
+  }
+  .device:hover{
+    transform: translateY(-6px) rotate(0deg) !important;
+    box-shadow: 12px 18px 0 rgba(32,30,25,0.14);
+  }
+  .device.tilt{ transform: rotate(-3deg); }
+
+  /* ---------- hero ---------- */
+  .hero{
+    padding: 76px 0 84px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-grid{
+    display:grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .hero h1{
+    font-size: 55px;
+    line-height: 1.05;
+  }
+  .hero .lede{
+    margin-top: 22px;
+    font-size: 19px;
+    color: var(--ink-soft);
+    max-width: 46ch;
+  }
+  .hero .cta-row{
+    margin-top: 32px;
+    display:flex; align-items:center; gap:18px; flex-wrap: wrap;
+  }
+  .hero .cta-note{ font-size:14px; color: var(--ink-soft); }
+
+  @media (max-width: 480px){
+    .cta-row{ flex-direction: column; align-items: stretch; gap: 12px; }
+    .cta-row .btn{ justify-content:center; width: 100%; padding-top:14px; padding-bottom:14px; }
+    .cta-row .cta-note{ text-align:center; }
+  }
+
+  .hero-visual{
+    position: relative;
+    display:flex; justify-content:center;
+  }
+
+  .grade-tag{
+    position:absolute;
+    background: var(--paper);
+    border: 1.5px solid var(--terracotta);
+    color: var(--terracotta);
+    font-family:'Space Grotesk'; font-weight:600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    top: 12%; left: -4%;
+    box-shadow: 3px 4px 0 rgba(32,30,25,0.08);
+    animation: float 5s ease-in-out infinite;
+  }
+  .grade-tag.green{
+    border-color: var(--moss); color: var(--moss);
+    top: auto; bottom: 8%; left: auto; right: -6%;
+    animation-delay: 1.4s;
+  }
+  @keyframes float{
+    0%, 100%{ transform: translateY(0); }
+    50%{ transform: translateY(-9px); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .grade-tag{ animation: none; }
+  }
+
+  /* ---------- route line ---------- */
+  .route{
+    position: relative;
+    padding: 12px 0 40px;
+  }
+  .route::before{
+    content:"";
+    position:absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-image: linear-gradient(var(--ink) 55%, transparent 0%);
+    background-size: 2px 14px;
+    background-repeat: repeat-y;
+    opacity: 0.28;
+    transform: translateX(-1px);
+  }
+  .marker{
+    position:absolute;
+    left:50%; top: 46px;
+    transform: translateX(-50%) scale(0.72);
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk'; font-weight:700; font-size:17px;
+    background: var(--cream);
+    border: 3px solid var(--accent, var(--ink));
+    color: var(--accent, var(--ink));
+    z-index: 3;
+    transition: transform .5s var(--ease), background .5s var(--ease), color .5s var(--ease);
+  }
+  .stop.visible .marker{
+    transform: translateX(-50%) scale(1);
+    background: var(--accent, var(--ink));
+    color: var(--paper);
+  }
+  .marker.start{ --accent: var(--moss); }
+  .marker.end{ --accent: var(--terracotta); }
+  .marker.hold{ --accent: var(--ochre); }
+
+  .stop{
+    position: relative;
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    align-items:center;
+    padding: 92px 0;
+    scroll-margin-top: 90px;
+  }
+  .stop:nth-child(odd) .stop-text{ order:1; }
+  .stop:nth-child(odd) .stop-visual{ order:2; }
+  .stop:nth-child(even) .stop-text{ order:2; }
+  .stop:nth-child(even) .stop-visual{ order:1; }
+
+  .stop-eyebrow{
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+  .stop h2{ font-size: 31px; line-height:1.16; }
+  .stop .body{ margin-top: 16px; color: var(--ink-soft); max-width: 42ch; }
+  .stop ul{
+    margin: 20px 0 0; padding:0; list-style:none;
+    display:flex; flex-direction:column; gap: 10px;
+  }
+  .stop ul li{
+    display:flex; gap: 10px; align-items:flex-start;
+    font-size: 15px; color: var(--ink);
+  }
+  .stop ul li::before{
+    content:"";
+    width: 7px; height:7px;
+    border-radius: 50%;
+    background: var(--terracotta);
+    margin-top: 8px;
+    flex: none;
+  }
+
+  .stop-visual{ display:flex; justify-content:center; }
+
+  /* ---------- feature strip ---------- */
+  .strip{
+    background: var(--ink);
+    color: var(--cream);
+    padding: 76px 0;
+  }
+  .strip h2{ color: var(--cream); font-size: 30px; max-width: 20ch; }
+  .strip .sub{ color: #c9c5b8; margin-top:12px; max-width: 50ch; }
+  .strip-grid{
+    margin-top: 44px;
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: rgba(237,232,218,0.15);
+    border: 1px solid rgba(237,232,218,0.15);
+  }
+  .strip-card{
+    background: var(--ink);
+    padding: 30px 26px;
+    transition: background .3s var(--ease);
+  }
+  .strip-card:hover{ background: #2a2721; }
+  .strip-card h3{
+    color: var(--ochre);
+    font-size: 17px;
+    margin-bottom:10px;
+  }
+  .strip-card p{ color:#c9c5b8; font-size:14.5px; }
+
+  /* ---------- closing CTA ---------- */
+  .finish{
+    padding: 108px 0 96px;
+    text-align:center;
+  }
+  .finish .marker{
+    position: static;
+    transform:none !important;
+    margin: 0 auto 26px;
+    background: var(--terracotta);
+    color: var(--paper);
+  }
+  .finish h2{ font-size: 39px; max-width: 20ch; margin: 0 auto; }
+  .finish .body{ margin: 18px auto 0; max-width: 46ch; color: var(--ink-soft); font-size: 18px; }
+  .finish .cta-row{ margin-top:34px; display:flex; justify-content:center; }
+
+  /* ---------- support & feedback ---------- */
+  .support{
+    padding: 64px 0 72px;
+    border-top: 1px solid var(--line);
+    text-align: center;
+  }
+  .support h2{ font-size: 27px; }
+  .support .body{ margin: 14px auto 0; max-width: 44ch; color: var(--ink-soft); font-size: 16px; }
+  .support .cta-row{ margin-top: 28px; justify-content:center; }
+  .btn.coffee{
+    background: var(--ochre); border-color: var(--ochre); color: var(--ink);
+  }
+  .btn.coffee::before{ background: var(--ink); }
+  .btn.coffee:hover{ color: var(--cream); border-color: var(--ink); }
+
+  footer{
+    border-top: 1px solid var(--line);
+    padding: 28px 0 40px;
+  }
+  .footer-inner{
+    display:flex; justify-content:space-between; align-items:center;
+    flex-wrap:wrap; gap:14px;
+    font-size: 14px; color: var(--ink-soft);
+  }
+  .footer-links{
+    display:flex; gap: 18px; flex-wrap: wrap;
+  }
+  .footer-links a{
+    text-decoration: none;
+    color: var(--ink-soft);
+    border-bottom: 1px solid transparent;
+    transition: color .2s ease, border-color .2s ease;
+  }
+  .footer-links a:hover{ color: var(--ink); border-color: var(--ink); }
+
+  @media (max-width: 560px){
+    .footer-inner{ flex-direction: column; align-items:flex-start; }
+    .footer-links{ gap: 14px; }
+  }
+
+  @media (max-width: 900px){
+    .subnav{ display:none; }
+  }
+
+  @media (max-width: 860px){
+    .hero{ padding: 52px 0 60px; }
+    .hero-grid{ grid-template-columns: 1fr; gap: 36px; }
+    .hero-visual{ order:-1; margin-bottom: 8px; }
+    .hero h1{ font-size: 36px; }
+    .hero .lede{ font-size: 17px; }
+    .grade-tag{ display:none; }
+
+    .route::before{ left: 20px; transform:none; }
+    .marker{ left: 20px; transform:translateX(0) scale(0.72); top: 0; width:40px; height:40px; font-size:15px; }
+    .stop.visible .marker{ transform: translateX(0) scale(1); }
+    .stop{
+      grid-template-columns: 1fr;
+      padding: 56px 0 56px 48px;
+      gap: 22px;
+    }
+    .stop h2{ font-size: 26px; }
+    .stop:nth-child(odd) .stop-text,
+    .stop:nth-child(even) .stop-text{ order:1; }
+    .stop:nth-child(odd) .stop-visual,
+    .stop:nth-child(even) .stop-visual{ order:2; }
+    .strip{ padding: 56px 0; }
+    .strip h2{ font-size: 26px; }
+    .strip-grid{ grid-template-columns: 1fr; }
+    .device.tilt{ transform: rotate(0); }
+    .device{ width: min(250px, 72vw); }
+    .finish{ padding: 76px 0 68px; }
+    .finish h2{ font-size: 28px; }
+    .finish .body{ font-size: 16.5px; }
+    .support{ padding: 56px 0; }
+    .support h2{ font-size: 24px; }
+  }
+
+  @media (max-width: 380px){
+    .hero h1{ font-size: 32px; }
+    .stop{ padding-left: 42px; }
+    .marker{ left: 16px; }
+    .route::before{ left: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav" id="siteNav">
+  <div class="nav-inner">
+    <div class="brand">
+      <svg width="24" height="20" viewBox="0 0 24 20" fill="none"><path d="M1 19 L8 5 L12 12.5 L15.5 7 L23 19Z" fill="#201E19"/></svg>
+      Chalkline
+    </div>
+    <ul class="subnav">
+      <li><a href="#log" data-nav>Log</a></li>
+      <li><a href="#live" data-nav>Live Log</a></li>
+      <li><a href="#share" data-nav>Sharing</a></li>
+      <li><a href="#community" data-nav>Community</a></li>
+      <li><a href="#sessions" data-nav>Sessions</a></li>
+      <li><a href="#chat" data-nav>Chat</a></li>
+    </ul>
+    <a class="btn small" href="https://zhixiang28.github.io/chalkline/">Open the app</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="reveal visible">
+      <h1>Draw the line from first try to send.</h1>
+      <p class="lede">Chalkline is the climbing companion that logs every attempt, times your session live, and turns today's climb into something worth sharing with your crew.</p>
+      <div class="cta-row">
+        <a class="btn" href="https://zhixiang28.github.io/chalkline/">Open Chalkline</a>
+        <span class="cta-note">Free to sign up — boulder, top rope, or lead.</span>
+      </div>
+    </div>
+    <div class="hero-visual reveal visible d1">
+      <div class="device tilt">
+        <img class="shot" src="images/log-detail.jpeg" alt="Chalkline log entry for a V2 boulder problem called The white wall, showing three attempts and marked start, hand and end points on the wall photo" loading="lazy">
+      </div>
+      <span class="grade-tag">Boulder V2</span>
+      <span class="grade-tag green">Route 5.4</span>
+    </div>
+  </div>
+</section>
+
+<div class="route">
+
+  <div class="wrap" style="position:relative;">
+    <div class="marker start reveal" style="position:absolute; left:50%; top:-14px; transform:translateX(-50%) scale(0.72);"><span>S</span></div>
+  </div>
+
+  <div class="wrap">
+
+    <article class="stop" id="log">
+      <div class="marker hold"><span>1</span></div>
+      <div class="stop-text reveal">
+        <p class="stop-eyebrow">Log page</p>
+        <h2>Every attempt, actually recorded.</h2>
+        <p class="body">Log a single project you keep coming back to, or a full day at the gym in one go. Real grading — V-scale with the Camp5 colour chart for boulders, US grades with French equivalents for routes — so the numbers mean something.</p>
+        <ul>
+          <li>Backdate a session you forgot to log, or leave it on today</li>
+          <li>Mark exactly where your hands started and finished on the wall photo</li>
+          <li>Tag the technique — heel hook, crimp, dyno, drop knee, and more</li>
+        </ul>
+      </div>
+      <div class="stop-visual reveal d1">
+        <div class="device"><img class="shot" src="images/log-detail.jpeg" alt="Full detail view of a logged climb showing attempt-by-attempt notes, technique tags and a star rating" loading="lazy"></div>
+      </div>
+    </article>
+
+    <article class="stop" id="live">
+      <div class="marker hold"><span>2</span></div>
+      <div class="stop-text reveal">
+        <p class="stop-eyebrow">Live Log</p>
+        <h2>Climb first. Log while it happens.</h2>
+        <p class="body">Set up the problem, tap start, and Chalkline runs a clean live timer for the attempt — plus a separate rest timer between goes. Fall at the quarter, half, or three-quarter mark with one tap.</p>
+        <ul>
+          <li>Tap the wall photo to pin exactly where each fall happened</li>
+          <li>Jot what to change before the next try, while it's fresh</li>
+          <li>Keep going across sessions on the same project</li>
+        </ul>
+      </div>
+      <div class="stop-visual reveal d1">
+        <div class="device"><img class="shot" src="images/livelog-timer.jpeg" alt="Live Log screen mid-attempt showing a running timer and fall buttons for quarter, half and three-quarter height" loading="lazy"></div>
+      </div>
+    </article>
+
+    <article class="stop">
+      <div class="marker hold"><span>3</span></div>
+      <div class="stop-text reveal">
+        <p class="stop-eyebrow">Finish the attempt</p>
+        <h2>Rate it, note it, done.</h2>
+        <p class="body">Once you send it, tag the technique that got you through, rate how satisfied you are out of five stars, and leave a note for tomorrow-you. Set the whole entry to public or keep it private — your call, entry by entry.</p>
+        <ul>
+          <li>Same technique tags as your full log, so nothing's disconnected</li>
+          <li>A satisfaction rating that's about the climb, not the crowd</li>
+          <li>Public or private, decided per entry</li>
+        </ul>
+      </div>
+      <div class="stop-visual reveal d1">
+        <div class="device"><img class="shot" src="images/livelog-technique.jpeg" alt="End of a Live Log session showing technique tags selected, a five star satisfaction rating and a notes field" loading="lazy"></div>
+      </div>
+    </article>
+
+    <article class="stop" id="share">
+      <div class="marker hold"><span>4</span></div>
+      <div class="stop-text reveal">
+        <p class="stop-eyebrow">Sharing</p>
+        <h2>Send it. Then actually show it off.</h2>
+        <p class="body">Turn any log into a card worth sending — an achievement badge, a stats summary, or the full uncropped wall photo with every start, end and fall point marked and your attempt count right on it.</p>
+        <ul>
+          <li>Native share sheet — straight to WhatsApp, Messages, anywhere</li>
+          <li>Every share copies a link too, no extra step</li>
+          <li>A scannable QR "name tag" for your profile, works from any camera</li>
+        </ul>
+      </div>
+      <div class="stop-visual reveal d1">
+        <div class="device"><img class="shot" src="images/share-fullphoto.jpeg" alt="Share screen with a full-photo card for a sent V2 boulder, showing marked wall points, time and attempt count" loading="lazy"></div>
+      </div>
+    </article>
+
+    <article class="stop" id="community">
+      <div class="marker hold"><span>5</span></div>
+      <div class="stop-text reveal">
+        <p class="stop-eyebrow">Community feed</p>
+        <h2>A feed for climbers, not for scrolling.</h2>
+        <p class="body">Following, Suggested, and Good Deals — one feed for the people you climb with, one for discovering more, and one just for gear. Attach a real log to any post so a sent climb comes with the receipts.</p>
+        <ul>
+          <li>Photo carousels sized to your actual photo, never cropped</li>
+          <li>Tap an attached log to open its full detail</li>
+          <li>Gear for sale, with the same likes and comments as any post</li>
+        </ul>
+      </div>
+      <div class="stop-visual reveal d1">
+        <div class="device"><img class="shot" src="images/feed-suggested-elcap.jpeg" alt="Community feed showing a suggested post with a large wall photo, like, comment and share icons" loading="lazy"></div>
+      </div>
+    </article>
+
+    <article class="stop" id="sessions">
+      <div class="marker hold"><span>6</span></div>
+      <div class="stop-text reveal">
+        <p class="stop-eyebrow">Sessions</p>
+        <h2>Nobody sends alone.</h2>
+        <p class="body">Plan a session at your gym, invite the people you actually climb with, and let them join straight from the card. Hosting a course instead? Set the capacity and let people fill the spots.</p>
+        <ul>
+          <li>Join or leave with one tap — hosts cancel their own instead</li>
+          <li>Comment on the session to coordinate before anyone shows up</li>
+          <li>Tap any participant's avatar to see who's coming</li>
+        </ul>
+      </div>
+      <div class="stop-visual reveal d1">
+        <div class="device"><img class="shot" src="images/sessions.jpeg" alt="Sessions list showing an upcoming climb-together session and a gym-hosted course with spots remaining" loading="lazy"></div>
+      </div>
+    </article>
+
+    <article class="stop" id="chat">
+      <div class="marker hold"><span>7</span></div>
+      <div class="stop-text reveal">
+        <p class="stop-eyebrow">Chat</p>
+        <h2>Message anyone you climb with.</h2>
+        <p class="body">Direct messages between climbers, with sensible gating — you can always message first, but further messages wait for a reply or a mutual follow. Shared posts and profile links open right where they point.</p>
+        <ul>
+          <li>Block or unblock right from the conversation</li>
+          <li>Send a post or log straight into a chat</li>
+          <li>Message anyone directly from their profile</li>
+        </ul>
+      </div>
+      <div class="stop-visual reveal d1">
+        <div class="device"><img class="shot" src="images/chat.jpeg" alt="Direct message conversation with a shared climbing post and profile link" loading="lazy"></div>
+      </div>
+    </article>
+
+  </div>
+</div>
+
+<section class="strip">
+  <div class="wrap">
+    <h2 class="reveal">What's underneath it all.</h2>
+    <p class="sub reveal d1">The parts that don't show up in a screenshot, but decide whether the app actually holds up.</p>
+    <div class="strip-grid reveal d2">
+      <div class="strip-card">
+        <h3>Real accounts</h3>
+        <p>Secure email and password login, a guided sign-up that captures your level and qualifications, and a two-step account deletion that actually removes everything.</p>
+      </div>
+      <div class="strip-card">
+        <h3>Live, multi-user backend</h3>
+        <p>Your data is shared with your friends in real time, not stuck on one phone. Private posts are enforced by the database, not just hidden by the interface.</p>
+      </div>
+      <div class="strip-card">
+        <h3>Progress you can see</h3>
+        <p>Badges for grade milestones, hours climbed and total sends, plus grade-distribution and six-month activity charts you can filter by discipline.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="finish">
+  <div class="wrap">
+    <div class="marker end reveal"><span>E</span></div>
+    <h2 class="reveal">Your next session starts the log.</h2>
+    <p class="body reveal d1">No forms to fill in after the fact, no photos lost in your camera roll. Open Chalkline before you chalk up, and let the route write itself.</p>
+    <div class="cta-row reveal d2">
+      <a class="btn" href="https://zhixiang28.github.io/chalkline/">Open Chalkline</a>
+    </div>
+  </div>
+</section>
+
+<section class="support">
+  <div class="wrap">
+    <h2 class="reveal">Built solo, kept going by people who climb.</h2>
+    <p class="body reveal d1">If Chalkline's useful on your next session, a coffee helps keep it running — and a note about what worked or what didn't helps more than you'd think.</p>
+    <div class="cta-row reveal d2">
+      <a class="btn coffee" href="https://buymeacoffee.com/itszhixianv" target="_blank" rel="noopener">Buy me a coffee</a>
+      <a class="btn ghost" href="mailto:itszhixiang@gmail.com">Send feedback</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-inner">
+    <span>Chalkline — a climbing companion app.</span>
+    <div class="footer-links">
+      <a href="https://zhixiang28.github.io/chalkline/">Open the app</a>
+      <a href="https://buymeacoffee.com/itszhixianv" target="_blank" rel="noopener">Buy me a coffee</a>
+      <a href="mailto:itszhixiang@gmail.com">itszhixiang@gmail.com</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // nav shadow on scroll
+  const nav = document.getElementById('siteNav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 8);
+  }, { passive: true });
+
+  // reveal on scroll
+  const reveals = document.querySelectorAll('.reveal');
+  const stops = document.querySelectorAll('.stop');
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting){
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
+
+  reveals.forEach(el => io.observe(el));
+
+  const stopIo = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting){
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.35 });
+  stops.forEach(el => stopIo.observe(el));
+
+  // active section highlight in subnav
+  const navLinks = document.querySelectorAll('[data-nav]');
+  const sections = Array.from(navLinks).map(a => document.querySelector(a.getAttribute('href')));
+
+  const navIo = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = '#' + entry.target.id;
+      const link = document.querySelector('[data-nav][href="' + id + '"]');
+      if (!link) return;
+      if (entry.isIntersecting){
+        navLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+
+  sections.forEach(s => { if (s) navIo.observe(s); });
+</script>
+
+</body>
+</html>
